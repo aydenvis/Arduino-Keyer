@@ -1,46 +1,81 @@
 // Keyboard - Version: Latest
 #include <Keyboard.h>
-int potPin = 9;
 
-int ditPin = 2;
-int dahPin = 4;
+int ditPin = 2; //The Pin your dit line is connected to. Corresponds to the number printed on the board.
+int dahPin = 4; //The Pin your dah line is connected to. Corresponds to the number printed on the board.
+int sw = 6; //The Pin you connect to one side of the switch.
 
-char keyer = 32;      
-double spacing = 100; //timing in milliseconds. Time of one dit, range of 240 (1 wpm) to 48 (25 wpm. 120 (10 wpm), 100 (13 wpm), 80 (15 wpm)
-boolean alpha = false;
+int RXled = 17; //17 is the Pro Micro's built in RX light. A value of HIGH means that the LED is off, used to indicate which mode you're in
+int TXled = 30; //30 is the Pro Mciros's built in TX light. By default it flashes when ever you key. I found that annoying and turned it off. To reenable, comment last line in setup() below.
+
+char keyer = 32; //this is the ascii code of the key you want to press. 32 is Enter.   
+int wpm = 15; //The default wpm the keyer operates at upon startup.
+float spacing = (60.0/(50.0*(float)(wpm)))*1000.0; //This math works out the corresponding time in milliseconds of one dit.
 
 void setup()
 {
-  pinMode(ditPin, INPUT_PULLUP);  
-  pinMode(dahPin, INPUT_PULLUP);
+  pinMode(ditPin, INPUT_PULLUP); //Sets the dit pin to go LOW when connected
+  pinMode(dahPin, INPUT_PULLUP); //Sets the dah pin to go LOW when connected
+  pinMode(sw, INPUT_PULLUP); //Sets the switch pin to go LOW when connected
+  
+  pinMode(RXled, OUTPUT); //Sets the TXled pin to output
+  Keyboard.begin(); //Needed to initialize keyboard output.
 
-  Keyboard.begin();
+  pinMode(TXled, INPUT); //Comment this line to enable flashing whenever you key.
 }
-void loop() {
-  while (digitalRead(ditPin) == LOW)
+
+void(* resetFunc) (void) = 0; //declare reset function @ address 0, useful for reflashing the board w/o shorting Gnd and Rst.
+
+void loop() 
+{
+//Key Mode
+  if(digitalRead(sw) == HIGH) //When the switch is OFF
   {
-    sendDit();      
-    delay(spacing);
-    if (digitalRead(dahPin) == LOW)
+    digitalWrite(17,HIGH); //This turns the LED off, because reasons. Denotes that the keyer is in Key Mode.
+    while (digitalRead(ditPin) == LOW) //When the dit level makes contact
+    {
+      sendDit();      
+      delay(spacing);
+      if (digitalRead(dahPin) == LOW)//When the dah lever makes contact
+      {
+        sendDah();
+        delay(spacing);
+      }
+    }
+  
+    while (digitalRead(dahPin) == LOW) //When the dah lever makes contact
     {
       sendDah();
       delay(spacing);
+      if (digitalRead(ditPin) == LOW) //When the dit level makes contact
+      {
+        sendDit();
+        delay(spacing);
+      }
     }
   }
-
-  while (digitalRead(dahPin) == LOW) 
+  
+//WPM Edit Mode
+  else if(digitalRead(sw) == LOW) 
   {
-    sendDah();
-    delay(spacing);
-    if (digitalRead(ditPin) == LOW)
+    digitalWrite(17, LOW); //This turns the LED on, because reasons. Denotes that the keyer is in Edit Mode.
+    if(digitalRead(ditPin)==LOW && digitalRead(dahPin)!=LOW) //Press the dit paddle ONLY to increase the wpm by 1. Have your cursor in a notepad or other text editor so you can see the wpm.
     {
-      sendDit();
-      delay(spacing);
+      speedUp();
     }
+  
+    else if(digitalRead(dahPin)==LOW && digitalRead(ditPin)!=LOW) //Press the dit paddle ONLY to decrease the wpm by 1. Have your cursor in a notepad or other text editor so you can see the wpm.
+    {
+      speedDown();
+    }
+   else if(digitalRead(ditPin)==LOW && digitalRead(dahPin)==LOW) //Press both paddles to enter bootloader mode.
+   {
+    resetFunc();
+   }
   }
 }
 
-void sendDit() {
+void sendDit() { //The following functions just clean up the code, no need to alter them unless you want to make the Edit Mode repeat faster
     Keyboard.press(keyer);
     delay(spacing);
     Keyboard.release(keyer);
@@ -51,3 +86,22 @@ void sendDah() {
     delay(spacing*3);
     Keyboard.release(keyer);
 }
+
+void speedUp()
+{
+  wpm++;
+  spacing = 60.0/(50.0*(float)(wpm))*1000.0;
+  Keyboard.println(wpm);
+  Keyboard.println(' ');
+  delay(200); //Adjust this value to make altering the wpm faster. A lower value will make it harder to control precisely.
+}
+
+void speedDown()
+{
+  wpm--;
+  spacing = 60.0/(50.0*(float)(wpm))*1000.0;
+  Keyboard.println(wpm);
+  Keyboard.println(' ');
+  delay(200); //Adjust this value to make altering the wpm faster. A lower value will make it harder to control precisely.
+}
+
