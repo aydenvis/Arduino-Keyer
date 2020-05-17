@@ -8,8 +8,11 @@ int sw = 6; //The Pin you connect to one side of the switch.
 int RXled = 17; //17 is the Pro Micro's built in RX light. A value of HIGH means that the LED is off, used to indicate which mode you're in
 int TXled = 30; //30 is the Pro Mciros's built in TX light. By default it flashes when ever you key. I found that annoying and turned it off. To reenable, comment last line in setup() below.
 
-char keyer = 32; //this is the ascii code of the key you want to press. 32 is Enter.   
-int wpm = 15; //The default wpm the keyer operates at upon startup.
+char enter = 32; //This is the ascii code of enter
+char keyer = enter; //This is the key the keyer will press.
+char listOfKeys[] = {enter, KEY_DOWN_ARROW};
+
+int wpm = 13; //The default wpm the keyer operates at upon startup.
 float spacing = (60.0/(50.0*(float)(wpm)))*1000.0; //This math works out the corresponding time in milliseconds of one dit.
 
 void setup()
@@ -59,19 +62,28 @@ void loop()
   else if(digitalRead(sw) == LOW) 
   {
     digitalWrite(17, LOW); //This turns the LED on, because reasons. Denotes that the keyer is in Edit Mode.
-    if(digitalRead(ditPin)==LOW && digitalRead(dahPin)!=LOW) //Press the dit paddle ONLY to increase the wpm by 1. Have your cursor in a notepad or other text editor so you can see the wpm.
+    if(digitalRead(ditPin) == LOW && digitalRead(dahPin) != LOW) //Press the dit paddle ONLY to increase the wpm by 1. Have your cursor in a notepad or other text editor so you can see the wpm.
     {
       speedUp();
     }
   
-    else if(digitalRead(dahPin)==LOW && digitalRead(ditPin)!=LOW) //Press the dit paddle ONLY to decrease the wpm by 1. Have your cursor in a notepad or other text editor so you can see the wpm.
+    else if(digitalRead(dahPin) == LOW && digitalRead(ditPin) != LOW) //Press the dit paddle ONLY to decrease the wpm by 1. Have your cursor in a notepad or other text editor so you can see the wpm.
     {
       speedDown();
     }
-   else if(digitalRead(ditPin)==LOW && digitalRead(dahPin)==LOW) //Press both paddles to enter bootloader mode.
-   {
-    resetFunc();
-   }
+    else if(digitalRead(ditPin) == LOW && digitalRead(dahPin) == LOW) //Hit both paddles, then hold the dit lever to toggle the key that is sent, or the dah lever to reset the board.
+    {
+      delay(500);
+      if(digitalRead(dahPin) == LOW)
+      {
+        resetFunc();
+      }
+      else if(digitalRead(ditPin) == LOW)
+      {
+        toggleWord();
+        delay(1000);
+      }
+    }
   }
 }
 
@@ -103,5 +115,19 @@ void speedDown()
   Keyboard.println(wpm);
   Keyboard.println(' ');
   delay(200); //Adjust this value to make altering the wpm faster. A lower value will make it harder to control precisely.
+}
+
+void toggleWord()
+{
+  if(keyer == enter)
+  {
+    keyer = KEY_DOWN_ARROW;
+    Keyboard.println("down");
+  }
+  else
+  {
+    keyer = enter;
+    Keyboard.println("enter");
+  }
 }
 
